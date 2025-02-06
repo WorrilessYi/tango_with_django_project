@@ -171,8 +171,10 @@ cython_debug/
 .pypirc
 
 .pyc
+*.pyc
 .DS_Store
 *.key
 thumbs.db
 
 tests/
+migrations/
