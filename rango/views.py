@@ -1,3 +1,5 @@
+from datetime import datetime
+
 from django.contrib.auth import login, authenticate, logout
 from django.contrib.auth.decorators import login_required
 from django.http import HttpResponse
@@ -16,14 +18,20 @@ def index(request):
                     'categories': category_list,
                     'pages': page_list
                     }
+    visitor_cookie_handler(request)
 
-    return render(request, 'rango/index.html', context=context_dict)
+    response = render(request,'rango/index.html',context=context_dict)
+    return response
 
 
 def about(request):
-    print(request.method)
-    print(request.user)
-    return render(request, 'rango/about.html', {})
+    visitor_cookie_handler(request)
+    visits = request.session['visits']
+    if request.session.test_cookie_worked():
+        print("TEST COOKIE WORKED!")
+        request.session.delete_test_cookie()
+
+    return render(request, 'rango/about.html', {'visits': visits})
 
 
 def show_category(request, category_name_slug):
@@ -40,6 +48,7 @@ def show_category(request, category_name_slug):
 
     return render(request, 'rango/category.html', context=context_dict)
 
+
 @login_required
 def add_category(request):
     form = CategoryForm()
@@ -53,6 +62,7 @@ def add_category(request):
         else:
             print(form.errors)
     return render(request, 'rango/add_category.html', {'form': form})
+
 
 @login_required
 def add_page(request, category_name_slug):
@@ -82,6 +92,7 @@ def add_page(request, category_name_slug):
     context_dict = {'form': form, 'category': category}
     return render(request, 'rango/add_page.html', context=context_dict)
 
+
 def register(request):
     registered = False
     if request.method == 'POST':
@@ -110,6 +121,7 @@ def register(request):
                              'profile_form': profile_form,
                              'registered': registered})
 
+
 def user_login(request):
     if request.method == 'POST':
         username = request.POST.get('username')
@@ -128,11 +140,34 @@ def user_login(request):
     else:
         return render(request, 'rango/login.html')
 
+
 @login_required
 def restricted(request):
     return render(request, 'rango/restricted.html')
+
 
 @login_required
 def user_logout(request):
     logout(request)
     return redirect(reverse('rango:index'))
+
+
+def visitor_cookie_handler(request):
+    visits = int(get_server_side_cookie(request, 'visits', '1'))
+    last_visit_cookie = get_server_side_cookie(request,'last_visit', str(datetime.now()))
+    last_visit_time = datetime.strptime(last_visit_cookie[:-7], '%Y-%m-%d %H:%M:%S')
+    # If it's been more than a day since the last visit...
+    if (datetime.now() - last_visit_time).days > 0:
+        visits = visits + 1
+        request.session['last_visit'] = str(datetime.now())
+    else:
+        request.session['last_visit'] = last_visit_cookie
+
+    request.session['visits'] = visits
+
+
+def get_server_side_cookie(request, cookie, default_val=0):
+    val = request.session.get(cookie)
+    if not val:
+        val = default_val
+    return val
